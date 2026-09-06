@@ -1,0 +1,6 @@
+{
+  "name": "EarnTime",
+  "description": "AI Productivity Reward & App Control System",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

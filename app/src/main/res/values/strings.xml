@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">EarnTime</string>
+    <string name="accessibility_service_description">EarnTime needs this service to monitor app usage and block distracting apps when your time runs out.</string>
+</resources>
