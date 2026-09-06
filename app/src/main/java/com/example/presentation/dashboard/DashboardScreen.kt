@@ -463,12 +463,26 @@ fun DashboardScreen(
     }
 }
 
-fun checkAccessibility(context: android.content.Context): Boolean {
-    val enabledServices = android.provider.Settings.Secure.getString(
-        context.contentResolver,
-        android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-    )
-    return enabledServices?.contains(context.packageName) == true
+fun hasUsageStatsPermission(context: android.content.Context): Boolean {
+    val appOps = context.getSystemService(android.content.Context.APP_OPS_SERVICE) as android.app.AppOpsManager
+    val mode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        appOps.unsafeCheckOpNoThrow(
+            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            context.packageName
+        )
+    } else {
+        appOps.checkOpNoThrow(
+            android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            context.packageName
+        )
+    }
+    return mode == android.app.AppOpsManager.MODE_ALLOWED
+}
+
+fun hasOverlayPermission(context: android.content.Context): Boolean {
+    return android.provider.Settings.canDrawOverlays(context)
 }
 
 @Composable
