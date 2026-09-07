@@ -8,6 +8,9 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.EarnTimeApplication
 import com.example.data.entities.ControlledAppEntity
+import com.example.data.entities.ControlledAppModes
+import com.example.data.entities.UnlockEndReasons
+import com.example.data.repository.AppUnlockRepository
 import com.example.data.repository.ControlledAppRepository
 import com.example.domain.usecases.ScanInstalledAppsUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +27,7 @@ data class AppSelectionUiState(
 
 class AppSelectionViewModel(
     private val controlledAppRepository: ControlledAppRepository,
+    private val appUnlockRepository: AppUnlockRepository,
     private val scanInstalledAppsUseCase: ScanInstalledAppsUseCase
 ) : ViewModel() {
 
@@ -64,36 +68,48 @@ class AppSelectionViewModel(
 
     fun toggleAppSelection(app: ControlledAppEntity) {
         val newSelectionState = !app.isSelected
-        val newMode = if (newSelectionState) "REWARD" else "FREE" // Default mode when selected
-        
+        // Selecting an app locks it straight away; access has to be bought with credits.
+        val newMode = if (newSelectionState) ControlledAppModes.REWARD else ControlledAppModes.FREE
+
         val updatedApp = app.copy(isSelected = newSelectionState, mode = newMode)
-        
+
         viewModelScope.launch {
             controlledAppRepository.saveApp(updatedApp)
-            
-            // Update local state
-            _uiState.update { state ->
-                val newApps = state.installedApps.map {
-                    if (it.packageName == updatedApp.packageName) updatedApp else it
-                }
-                state.copy(installedApps = newApps)
+            if (!newSelectionState) {
+                // No longer controlled, so close any open window and hand back the unused credits.
+                appUnlockRepository.endSessionsFor(
+                    packageName = app.packageName,
+                    reason = UnlockEndReasons.DESELECTED,
+                    refundUnused = true
+                )
             }
+            applyLocally(updatedApp)
         }
     }
-    
+
     fun setAppMode(app: ControlledAppEntity, mode: String) {
-        val updatedApp = app.copy(mode = mode, isSelected = mode != "FREE")
-        
+        val updatedApp = app.copy(mode = mode, isSelected = mode != ControlledAppModes.FREE)
+
         viewModelScope.launch {
             controlledAppRepository.saveApp(updatedApp)
-            
-            // Update local state
-            _uiState.update { state ->
-                val newApps = state.installedApps.map {
-                    if (it.packageName == updatedApp.packageName) updatedApp else it
-                }
-                state.copy(installedApps = newApps)
+            if (mode != ControlledAppModes.REWARD) {
+                // Paid time only makes sense in REWARD mode; refund whatever is left.
+                appUnlockRepository.endSessionsFor(
+                    packageName = app.packageName,
+                    reason = UnlockEndReasons.MODE_CHANGED,
+                    refundUnused = true
+                )
             }
+            applyLocally(updatedApp)
+        }
+    }
+
+    private fun applyLocally(updatedApp: ControlledAppEntity) {
+        _uiState.update { state ->
+            val newApps = state.installedApps.map {
+                if (it.packageName == updatedApp.packageName) updatedApp else it
+            }
+            state.copy(installedApps = newApps)
         }
     }
 
@@ -103,6 +119,7 @@ class AppSelectionViewModel(
                 val application = (this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as EarnTimeApplication)
                 AppSelectionViewModel(
                     application.container.controlledAppRepository,
+                    application.container.appUnlockRepository,
                     ScanInstalledAppsUseCase(application.applicationContext)
                 )
             }

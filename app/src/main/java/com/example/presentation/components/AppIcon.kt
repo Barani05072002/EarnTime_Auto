@@ -25,8 +25,11 @@ import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+
 @Composable
-fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
+fun AppIcon(packageName: String, modifier: Modifier = Modifier, isLocked: Boolean = false) {
     val context = LocalContext.current
     var bitmap by remember(packageName) { mutableStateOf<ImageBitmap?>(null) }
     
@@ -43,10 +46,19 @@ fun AppIcon(packageName: String, modifier: Modifier = Modifier) {
         }
     }
     
+    val colorFilter = if (isLocked) {
+        val matrix = ColorMatrix()
+        matrix.setToSaturation(0f)
+        ColorFilter.colorMatrix(matrix)
+    } else {
+        null
+    }
+    
     if (bitmap != null) {
         Image(
             bitmap = bitmap!!,
             contentDescription = "App Icon",
+            colorFilter = colorFilter,
             modifier = modifier
         )
     } else {

@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.example.data.entities.CreditTypes
 import com.example.data.repository.CreditRepository
 
 class TasksViewModel(
@@ -44,7 +45,7 @@ class TasksViewModel(
             taskRepository.updateTaskStatus(task.id, "COMPLETED", System.currentTimeMillis())
             creditRepository.addTransaction(
                 amount = task.reward,
-                type = "TASK_REWARD",
+                type = CreditTypes.TASK_REWARD,
                 reason = "Completed task: ${task.title}",
                 taskId = task.id
             )

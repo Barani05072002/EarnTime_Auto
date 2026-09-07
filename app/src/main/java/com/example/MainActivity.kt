@@ -34,7 +34,8 @@ class MainActivity : ComponentActivity() {
                             DashboardScreen(
                                 onNavigateToTasks = { navController.navigate("tasks") },
                                 onNavigateToHabits = { navController.navigate("habits") },
-                                onNavigateToApps = { navController.navigate("apps") }
+                                onNavigateToApps = { navController.navigate("apps") },
+                                onNavigateToStats = { navController.navigate("stats") }
                             )
                         }
                         composable("tasks") {
@@ -48,10 +49,13 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("habits") {
-                            Text("Habits Screen (TODO)", modifier = Modifier.padding(innerPadding))
+                            com.example.presentation.habits.HabitsScreen()
                         }
                         composable("apps") {
                             com.example.presentation.apps.AppSelectionScreen()
+                        }
+                        composable("stats") {
+                            com.example.presentation.stats.StatsScreen()
                         }
                     }
                 }
