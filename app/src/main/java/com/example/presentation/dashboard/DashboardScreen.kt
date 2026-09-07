@@ -28,7 +28,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -54,15 +53,24 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.foundation.clickable
+import com.example.presentation.components.UnlockAppDialog
 
 @Composable
 fun DashboardScreen(
     onNavigateToTasks: () -> Unit,
     onNavigateToHabits: () -> Unit,
     onNavigateToApps: () -> Unit,
+    onNavigateToStats: () -> Unit,
     viewModel: DashboardViewModel = viewModel(factory = DashboardViewModel.Factory)
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val unlockError by viewModel.unlockError.collectAsStateWithLifecycle()
+    val isUnlocking by viewModel.isUnlocking.collectAsStateWithLifecycle()
+    var appPendingUnlock by remember { mutableStateOf<ControlledAppStatus?>(null) }
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -164,15 +172,33 @@ fun DashboardScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text("👤")
+                androidx.compose.material3.IconButton(
+                    onClick = onNavigateToStats,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Filled.Settings,
+                        contentDescription = "Stats",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("👤")
+                }
             }
         }
 
@@ -393,7 +419,7 @@ fun DashboardScreen(
                         .padding(horizontal = 8.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "${uiState.selectedApps.size} Active",
+                        text = "${uiState.controlledApps.count { it.isLocked }} of ${uiState.controlledApps.size} locked",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium
@@ -401,7 +427,7 @@ fun DashboardScreen(
                 }
             }
 
-            if (uiState.selectedApps.isEmpty()) {
+            if (uiState.controlledApps.isEmpty()) {
                 Text(
                     text = "No apps controlled yet.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -409,18 +435,25 @@ fun DashboardScreen(
                     modifier = Modifier.padding(16.dp)
                 )
             } else {
-                uiState.selectedApps.take(3).forEach { app ->
-                    val isLocked = app.mode == "ALWAYS_BLOCKED"
-                    val timeLeft = if (isLocked) "LOCKED" else "${app.maxDailyUsageMinutes ?: 0}m MAX"
-                    val bgColor = if (isLocked) Color(0xFF3F0A1B) else Color(0xFF3F1900)
-                    
+                uiState.controlledApps.forEach { status ->
                     AppStatusItem(
-                        packageName = app.packageName,
-                        name = app.appName,
-                        timeLeft = timeLeft,
-                        mode = app.mode.replace("_", " "),
-                        isLocked = isLocked,
-                        bgColor = bgColor
+                        packageName = status.app.packageName,
+                        name = status.app.appName,
+                        timeLeft = status.remainingMinutesLabel,
+                        mode = when {
+                            !status.canUnlock -> "ALWAYS BLOCKED"
+                            status.isLocked -> "Tap to unlock with credits"
+                            else -> "Unlocked - timer runs while in use"
+                        },
+                        isLocked = status.isLocked,
+                        // Locked apps open the purchase dialog; unlocked ones can be re-locked early.
+                        onClick = {
+                            when {
+                                !status.canUnlock -> Unit
+                                status.isLocked -> appPendingUnlock = status
+                                else -> viewModel.lockAppNow(status.app.packageName)
+                            }
+                        }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -461,6 +494,27 @@ fun DashboardScreen(
         
         Spacer(modifier = Modifier.height(32.dp))
     }
+
+    appPendingUnlock?.let { status ->
+        UnlockAppDialog(
+            appName = status.app.appName,
+            balance = uiState.currentBalance,
+            isUnlocking = isUnlocking,
+            errorMessage = unlockError,
+            onDismiss = {
+                appPendingUnlock = null
+                viewModel.dismissUnlockError()
+            },
+            onConfirm = { minutes -> viewModel.unlockApp(status.app.packageName, minutes) }
+        )
+    }
+
+    // Close the dialog once the purchase lands.
+    LaunchedEffect(uiState.controlledApps) {
+        val pending = appPendingUnlock ?: return@LaunchedEffect
+        val current = uiState.controlledApps.find { it.app.packageName == pending.app.packageName }
+        if (current != null && !current.isLocked) appPendingUnlock = null
+    }
 }
 
 fun hasUsageStatsPermission(context: android.content.Context): Boolean {
@@ -486,12 +540,22 @@ fun hasOverlayPermission(context: android.content.Context): Boolean {
 }
 
 @Composable
-fun AppStatusItem(packageName: String, name: String, timeLeft: String, mode: String, isLocked: Boolean = false, bgColor: Color, opacity: Float = 1f) {
+fun AppStatusItem(
+    packageName: String,
+    name: String,
+    timeLeft: String,
+    mode: String,
+    isLocked: Boolean = false,
+    onClick: () -> Unit = {}
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp)),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = opacity)),
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLocked) 0.5f else 1f)
+        ),
         border = androidx.compose.foundation.BorderStroke(1.dp, OutlineDark.copy(alpha = 0.3f))
     ) {
         Row(
@@ -502,6 +566,7 @@ fun AppStatusItem(packageName: String, name: String, timeLeft: String, mode: Str
         ) {
             com.example.presentation.components.AppIcon(
                 packageName = packageName,
+                isLocked = isLocked,
                 modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp))
             )
             
@@ -545,7 +610,7 @@ fun AppStatusItem(packageName: String, name: String, timeLeft: String, mode: Str
                     }
                 }
                 Text(
-                    text = "Mode: $mode",
+                    text = mode,
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontStyle = if (isLocked) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal

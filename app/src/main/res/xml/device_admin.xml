@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <!-- We just need basic policies to be a device admin, though setPackagesSuspended doesn't strictly need a specific policy here, it just needs the app to be the Device/Profile Owner -->
+    </uses-policies>
+</device-admin>

@@ -10,6 +10,9 @@ data class HabitEntity(
     val description: String = "",
     val frequency: String = "DAILY", // DAILY, WEEKLY, CUSTOM
     val reward: Int = 10,
+    val currentStreak: Int = 0,
+    val longestStreak: Int = 0,
+    val lastCompletedDate: Long? = null,
     val startDate: Long = System.currentTimeMillis(),
     val endDate: Long? = null,
     val isActive: Boolean = true

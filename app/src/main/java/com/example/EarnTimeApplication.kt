@@ -10,5 +10,7 @@ class EarnTimeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = DefaultAppContainer(this)
+        // Initialize the suspension manager to start listening immediately
+        container.appSuspensionManager
     }
 }

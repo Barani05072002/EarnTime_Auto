@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.data.entities.ControlledAppEntity
+import com.example.data.entities.ControlledAppModes
 import com.example.presentation.components.AppIcon
 
 @Composable
@@ -48,7 +49,7 @@ fun AppSelectionScreen(
             modifier = Modifier.padding(bottom = 8.dp)
         )
         Text(
-            text = "Only selected apps will be controlled. Unselected apps remain FREE.",
+            text = "Selected apps are locked immediately. You unlock them by spending reward credits, and they re-lock the moment that time runs out.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(bottom = 16.dp)
@@ -132,16 +133,27 @@ fun AppSelectionItem(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
-                        selected = app.mode == "REWARD",
-                        onClick = { onModeChange("REWARD") },
-                        label = { Text("REWARD") }
+                        selected = app.mode == ControlledAppModes.REWARD,
+                        onClick = { onModeChange(ControlledAppModes.REWARD) },
+                        label = { Text("UNLOCK WITH CREDITS") }
                     )
                     FilterChip(
-                        selected = app.mode == "ALWAYS_BLOCKED",
-                        onClick = { onModeChange("ALWAYS_BLOCKED") },
-                        label = { Text("BLOCKED") }
+                        selected = app.mode == ControlledAppModes.ALWAYS_BLOCKED,
+                        onClick = { onModeChange(ControlledAppModes.ALWAYS_BLOCKED) },
+                        label = { Text("ALWAYS BLOCKED") }
                     )
                 }
+                Text(
+                    text = when (app.mode) {
+                        ControlledAppModes.ALWAYS_BLOCKED ->
+                            "Locked at all times. Credits cannot open it."
+                        else ->
+                            "Locked by default. Spend 1 credit per minute of use."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
             }
         }
     }

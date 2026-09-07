@@ -8,6 +8,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".EarnTimeApplication"
@@ -31,12 +32,20 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The lock screen. Its own taskAffinity keeps it in a dedicated task so it never drags
+          MainActivity's back stack in front of a blocked app, and singleTask means repeat blocks
+          are re-delivered to the one instance through onNewIntent instead of stacking up.
+        -->
         <activity
             android:name=".presentation.blocker.BlockerActivity"
             android:theme="@style/Theme.MyApplication"
             android:exported="false"
             android:excludeFromRecents="true"
-            android:launchMode="singleInstance" />
+            android:showOnLockScreen="true"
+            android:taskAffinity=".blocker"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:launchMode="singleTask" />
 
         <service
             android:name=".service.EarnTimeMonitorService"
@@ -45,6 +54,28 @@
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                       android:value="Usage tracking for blocking apps"/>
         </service>
+
+        <receiver
+            android:name=".service.BootCompletedReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter android:priority="1000">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".service.EarnTimeDeviceAdminReceiver"
+            android:permission="android.permission.BIND_DEVICE_ADMIN"
+            android:exported="true">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>
